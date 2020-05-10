@@ -34,6 +34,27 @@ pipeline {
                 }
             }
         }
+        stage('Deploy to Production'){
+            when{
+                branch 'master'
+            }
+            steps{
+                input 'Is the ready for Production?'
+                milestone(1)
+                withCredentials([usernamePassword(credentialsId: 'webserver_login', usernameVariable:'USERNAME', passwordVariable:'USERPASS')]){
+                    script{
+                        sh "sshpass -p '$USERPASS' -v ssh -o StrictHostKeyChecking=no $USERNAME@$prod_ip \" docker pull cdsbeef/train-schedules:${env.BUILD_NUMBER}\""
+                        try {
+                            sh "sshpass -p '$USERPASS' -v ssh -o StrictHostKeyChecking=no $USERNAME@$prod_ip \ "docker stop train-schedules\""
+                            sh "sshpass -p '$USERPASS' -v ssh -o StrictHostKeyChecking=no $USERNAME@$prod_ip \ "docker rm train-schedules\""
+                        }catch(err){
+                            echo: 'caught erro: $err'
+                        }
+                        sh "sshpass -p '$USERPASS' -v ssh -o StrictHostKeyChecking=no $USERNAME@$prod_ip \ "docker run --restart always --name train-schedules -p 8080:8080 -d cdsbeef/trains-schedules:${env.BUILD_NUMBER}\""
+                    }
+                }
+            }
 
+        }
     }
 }
